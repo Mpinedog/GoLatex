@@ -1,0 +1,14 @@
+.venv/
+.claude/
+run.sh
+__pycache__/
+*.pyc
+ejemplo/main.pdf
+ejemplo/*.aux
+ejemplo/*.log
+ejemplo/*.out
+ejemplo/*.bbl
+ejemplo/*.blg
+ejemplo/*.fls
+ejemplo/*.fdb_latexmk
+ejemplo/*.synctex.gz

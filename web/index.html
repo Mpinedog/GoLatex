@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GoLatex</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📄</text></svg>">
+<link rel="stylesheet" href="/vendor/codemirror/codemirror.min.css">
+<link rel="stylesheet" href="/vendor/codemirror/addon/dialog/dialog.min.css">
+<link rel="stylesheet" href="/vendor/codemirror/theme/material-darker.min.css">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand">Go<span>LaTeX</span></div>
+  <button id="btn-project" class="btn ghost" title="Abrir otro proyecto">
+    <span class="icon">📁</span><span id="project-name">Sin proyecto</span>
+  </button>
+  <select id="main-select" title="Archivo principal (raíz de compilación)"></select>
+  <button id="btn-compile" class="btn primary" title="Compilar (⌘⏎)">▶ Compilar</button>
+  <label class="toggle" title="Compilar automáticamente al guardar">
+    <input type="checkbox" id="chk-autocompile"><span>auto</span>
+  </label>
+  <div id="status-chip" class="chip">listo</div>
+  <div class="spacer"></div>
+  <button id="btn-theme" class="btn ghost icon-btn" title="Alternar modo oscuro">🌙</button>
+</header>
+
+<main id="layout">
+  <aside id="pane-tree">
+    <div class="pane-head">
+      <span>Archivos</span>
+      <span class="head-actions">
+        <button id="btn-new-file" class="mini" title="Nuevo archivo">＋</button>
+        <button id="btn-new-dir" class="mini" title="Nueva carpeta">⊞</button>
+      </span>
+    </div>
+    <div id="tree"></div>
+  </aside>
+
+  <div class="gutter" id="gutter-left"></div>
+
+  <section id="pane-editor">
+    <div id="tabs"></div>
+    <div id="ext-banner" hidden>
+      <span id="ext-banner-text"></span>
+      <button id="ext-reload" class="btn small">Recargar</button>
+      <button id="ext-keep" class="btn small ghost">Mantener lo mío</button>
+    </div>
+    <div id="editor-host"></div>
+    <div id="editor-empty" class="empty">
+      <div class="empty-logo">Go<span>LaTeX</span></div>
+      <p>Selecciona un archivo del árbol para editarlo.</p>
+      <p class="kbd-hints"><kbd>⌘S</kbd> guardar &nbsp; <kbd>⌘⏎</kbd> compilar &nbsp; <kbd>⌥clic</kbd> en el PDF → código</p>
+    </div>
+  </section>
+
+  <div class="gutter" id="gutter-right"></div>
+
+  <section id="pane-pdf">
+    <div class="pane-head pdf-toolbar">
+      <button id="pdf-prev" class="mini" title="Página anterior">‹</button>
+      <span id="pdf-pageinfo">–</span>
+      <button id="pdf-next" class="mini" title="Página siguiente">›</button>
+      <span class="vsep"></span>
+      <button id="pdf-zoom-out" class="mini" title="Alejar">−</button>
+      <span id="pdf-zoom">–</span>
+      <button id="pdf-zoom-in" class="mini" title="Acercar">＋</button>
+      <button id="pdf-fit" class="mini" title="Ajustar al ancho">⤢</button>
+      <span class="spacer"></span>
+      <span class="hint" title="Alt/⌥ + clic sobre el PDF salta a la línea de código (SyncTeX)">⌥clic → código</span>
+    </div>
+    <div id="pdf-container">
+      <div class="empty" id="pdf-empty">Aún no hay PDF.<br>Compila para verlo aquí.</div>
+    </div>
+  </section>
+</main>
+
+<footer id="panel-bottom" class="collapsed">
+  <div class="panel-tabs">
+    <button class="ptab active" data-tab="errors">Problemas <span id="err-count" class="badge" hidden></span></button>
+    <button class="ptab" data-tab="log">Log crudo</button>
+    <span class="spacer"></span>
+    <span id="compile-meta" class="hint"></span>
+    <button id="panel-toggle" class="mini" title="Mostrar/ocultar panel">▾</button>
+  </div>
+  <div id="panel-errors" class="panel-body"><div class="empty small">Sin problemas por ahora.</div></div>
+  <pre id="panel-log" class="panel-body" hidden></pre>
+</footer>
+
+<div id="toasts"></div>
+<div id="ctxmenu" hidden></div>
+
+<dialog id="dlg-project">
+  <h2>Abrir proyecto LaTeX</h2>
+  <div id="recents-block">
+    <h3>Recientes</h3>
+    <div id="recents"></div>
+  </div>
+  <h3>Explorar</h3>
+  <div class="browse-bar">
+    <input id="browse-path" type="text" spellcheck="false" placeholder="/ruta/a/mi/proyecto">
+    <button id="browse-go" class="btn small ghost">Ir</button>
+  </div>
+  <div id="browse-list"></div>
+  <div class="dlg-actions">
+    <button id="dlg-project-close" class="btn ghost">Cancelar</button>
+    <button id="browse-open" class="btn primary">Abrir esta carpeta</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-img"><img id="dlg-img-el" alt=""><div class="dlg-actions"><button class="btn ghost" id="dlg-img-close">Cerrar</button></div></dialog>
+
+<script src="/vendor/codemirror/codemirror.min.js"></script>
+<script src="/vendor/codemirror/mode/stex/stex.min.js"></script>
+<script src="/vendor/codemirror/addon/edit/matchbrackets.min.js"></script>
+<script src="/vendor/codemirror/addon/edit/closebrackets.min.js"></script>
+<script src="/vendor/codemirror/addon/selection/active-line.min.js"></script>
+<script src="/vendor/codemirror/addon/dialog/dialog.min.js"></script>
+<script src="/vendor/codemirror/addon/search/searchcursor.min.js"></script>
+<script src="/vendor/codemirror/addon/search/search.min.js"></script>
+<script src="/vendor/pdfjs/pdf.min.js"></script>
+<script type="module" src="/js/main.js"></script>
+</body>
+</html>
