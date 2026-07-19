@@ -9,14 +9,16 @@ export function initErrors(options) {
   document.querySelectorAll('.ptab').forEach((b) => {
     b.onclick = () => selectTab(b.dataset.tab);
   });
-  document.getElementById('panel-toggle').onclick = togglePanel;
+  // ojo: sin argumentos — pasar el event como `force` era lo que impedía cerrar
+  document.getElementById('panel-toggle').onclick = () => togglePanel();
 }
 
+// force === true abre, false cierra, sin argumento alterna.
 export function togglePanel(force) {
   const panel = document.getElementById('panel-bottom');
-  const collapse = force !== undefined ? !force : !panel.classList.contains('collapsed');
-  panel.classList.toggle('collapsed', collapse);
-  document.getElementById('panel-toggle').textContent = collapse ? '▴' : '▾';
+  const open = force !== undefined ? force : panel.classList.contains('collapsed');
+  panel.classList.toggle('collapsed', !open);
+  document.getElementById('panel-toggle').textContent = open ? '▾' : '▴';
 }
 
 function selectTab(name) {

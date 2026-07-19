@@ -204,6 +204,18 @@ function init() {
   });
 
   document.getElementById('btn-compile').onclick = compile;
+  document.getElementById('pdf-download').onclick = () => {
+    if (!project?.pdf_exists && !pdf.hasPdf()) {
+      toast('Aún no hay PDF; compila primero.', 'warn');
+      return;
+    }
+    const a = document.createElement('a');
+    a.href = '/api/pdf?v=' + Date.now();
+    a.download = (project?.name || 'documento') + '.pdf';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
   document.getElementById('btn-theme').onclick = () =>
     applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
   document.getElementById('btn-project').onclick = () => openProjectDialog(!!project);

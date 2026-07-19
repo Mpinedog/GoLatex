@@ -7,6 +7,7 @@ from typing import Optional
 
 from mcp.server.fastmcp import FastMCP, Image
 
+from . import ai_detect
 from . import bib as bib_tools
 from . import pdf_utils
 from .project import ProjectError
@@ -134,6 +135,17 @@ def bib_list(bib_file: Optional[str] = None) -> dict:
     """Lista las entradas del .bib del proyecto (clave, tipo, título, autor,
     año). Sin `bib_file` usa references.bib o el primero que encuentre."""
     return bib_tools.list_entries(STATE.require_project(), bib_file)
+
+
+@mcp.tool()
+def ai_check(path: Optional[str] = None, text: Optional[str] = None,
+             lang: str = "es") -> dict:
+    """Estima qué tan "IA" suena un texto (detector local texthumanize, sin
+    red). Pasa `path` (un .tex del proyecto: se limpia el LaTeX y se analiza
+    la prosa) o `text` directo; `lang` por defecto 'es'. Devuelve score 0-1
+    (0=humano, 1=IA), verdict, confianza, señales dominantes y los párrafos
+    más sospechosos. Es ORIENTATIVO: ningún detector de IA es concluyente."""
+    return ai_detect.analyze(STATE.project, path, text, lang)
 
 
 @mcp.tool()
