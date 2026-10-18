@@ -18,7 +18,8 @@
     <span class="icon">📁</span><span id="project-name">Sin proyecto</span>
   </button>
   <select id="main-select" title="Archivo principal (raíz de compilación)"></select>
-  <button id="btn-compile" class="btn primary" title="Compilar (⌘⏎)">▶ Compilar</button>
+  <select id="engine-select" title="Motor de compilación (auto: % !TEX program o fontspec → xelatex)"></select>
+  <button id="btn-compile" class="btn primary" title="Compilar (⌘⏎ / Ctrl+Enter)">▶ Compilar</button>
   <label class="toggle" title="Compilar automáticamente al guardar">
     <input type="checkbox" id="chk-autocompile"><span>auto</span>
   </label>
@@ -52,7 +53,7 @@
     <div id="editor-empty" class="empty">
       <div class="empty-logo">Go<span>LaTeX</span></div>
       <p>Selecciona un archivo del árbol para editarlo.</p>
-      <p class="kbd-hints"><kbd>⌘S</kbd> guardar &nbsp; <kbd>⌘⏎</kbd> compilar &nbsp; <kbd>⌥clic</kbd> en el PDF → código</p>
+      <p class="kbd-hints" id="kbd-hints"><kbd>⌘S</kbd> guardar &nbsp; <kbd>⌘⏎</kbd> compilar &nbsp; <kbd>⌥clic</kbd> en el PDF → código</p>
     </div>
   </section>
 
@@ -102,7 +103,7 @@
   </div>
   <h3>Explorar</h3>
   <div class="browse-bar">
-    <input id="browse-path" type="text" spellcheck="false" placeholder="/ruta/a/mi/proyecto">
+    <input id="browse-path" type="text" spellcheck="false" placeholder="ruta de la carpeta del proyecto">
     <button id="browse-go" class="btn small ghost">Ir</button>
   </div>
   <div id="browse-list"></div>

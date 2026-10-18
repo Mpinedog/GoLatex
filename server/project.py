@@ -10,6 +10,8 @@ from pathlib import Path
 
 from send2trash import send2trash
 
+from .config import ENGINES
+
 # Artefactos de compilación: se ocultan del árbol y se ignoran en el watcher.
 ARTIFACT_EXTS = {
     ".aux", ".log", ".fls", ".fdb_latexmk", ".out", ".toc", ".lof", ".lot",
@@ -38,12 +40,20 @@ def content_hash(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()[:16]
 
 
+ENGINE_MAGIC = re.compile(r"^\s*%\s*!\s*TeX\s+(?:TS-)?program\s*=\s*(\w+)",
+                          re.IGNORECASE | re.MULTILINE)
+NEEDS_UNICODE_ENGINE = re.compile(r"\\usepackage(?:\[[^\]]*\])?\{[^}]*\b(?:fontspec|unicode-math|polyglossia)\b")
+
+
 class Project:
-    def __init__(self, root: str | Path, main: str | None = None):
+    def __init__(self, root: str | Path, main: str | None = None,
+                 engine: str | None = None):
         self.root = Path(root).expanduser().resolve()
         if not self.root.is_dir():
             raise ProjectError(f"No existe la carpeta: {self.root}")
         self.main = main or self._guess_main()
+        # None = automático (comentario mágico / fontspec → xelatex; si no, pdflatex)
+        self.engine_setting: str | None = engine if engine in ENGINES else None
 
     # ---------- rutas ----------
 
@@ -60,7 +70,9 @@ class Project:
         return p
 
     def relpath(self, p: Path) -> str:
-        return str(Path(p).resolve().relative_to(self.root))
+        # siempre con '/', también en Windows: la UI, el log de LaTeX y el MCP
+        # usan esa forma, así un mismo archivo tiene una sola clave
+        return Path(p).resolve().relative_to(self.root).as_posix()
 
     # ---------- main / pdf ----------
 
@@ -70,7 +82,7 @@ class Project:
         candidates = sorted(self.root.glob("*.tex"))
         for c in candidates:
             try:
-                if "\\documentclass" in c.read_text(errors="replace"):
+                if "\\documentclass" in c.read_text(encoding="utf-8", errors="replace"):
                     return c.name
             except OSError:
                 continue
@@ -81,6 +93,34 @@ class Project:
         if p.suffix != ".tex":
             raise ProjectError("El archivo principal debe ser .tex")
         self.main = self.relpath(p)
+
+    # ---------- motor ----------
+
+    @property
+    def engine(self) -> str:
+        """Motor efectivo: el fijado por el usuario o el detectado."""
+        return self.engine_setting or self.detect_engine()
+
+    def detect_engine(self) -> str:
+        try:
+            text = self.main_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return "pdflatex"
+        m = ENGINE_MAGIC.search(text[:4000])
+        if m and m.group(1).lower() in ENGINES:
+            return m.group(1).lower()
+        body = re.sub(r"(?<!\\)%.*", "", text)
+        if NEEDS_UNICODE_ENGINE.search(body):
+            return "xelatex"
+        return "pdflatex"
+
+    def set_engine(self, engine: str | None) -> None:
+        if engine in (None, "", "auto"):
+            self.engine_setting = None
+            return
+        if engine not in ENGINES:
+            raise ProjectError(f"Motor no soportado: {engine} (usa {', '.join(ENGINES)} o auto)")
+        self.engine_setting = engine
 
     @property
     def main_path(self) -> Path:
@@ -108,7 +148,7 @@ class Project:
                 return
             seen.add(rel)
             try:
-                text = (self.root / rel).read_text(errors="replace")
+                text = (self.root / rel).read_text(encoding="utf-8", errors="replace")
             except OSError:
                 return
             text = re.sub(r"(?<!\\)%.*", "", text)  # sin comentarios
@@ -247,7 +287,7 @@ class Project:
                            for part in p.relative_to(self.root).parts[:-1])):
                 continue
             try:
-                lines = p.read_text(errors="replace").splitlines()
+                lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
             except OSError:
                 continue
             for i, line in enumerate(lines, 1):

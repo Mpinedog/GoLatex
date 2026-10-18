@@ -28,7 +28,7 @@ class _Handler(FileSystemEventHandler):
             return None
         if any(part in IGNORED_DIRS or part.startswith(".") for part in rel.parts):
             return None
-        return str(rel)
+        return rel.as_posix()
 
     def on_any_event(self, event):
         if event.is_directory and event.event_type == "modified":

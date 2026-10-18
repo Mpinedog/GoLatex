@@ -35,6 +35,8 @@ def project_info() -> dict:
     return {
         "root": str(p.root),
         "main": p.main,
+        "engine": p.engine,
+        "engine_setting": p.engine_setting or "auto",
         "inputs": p.inputs(),
         "pdf": p.pdf_path.name if pdf_exists else None,
         "pdf_exists": pdf_exists,
@@ -43,6 +45,15 @@ def project_info() -> dict:
         "last_compile_ok": (STATE.compiler.last_result or {}).get("ok")
         if STATE.compiler else None,
     }
+
+
+@mcp.tool()
+def set_engine(engine: str) -> dict:
+    """Fija el motor de compilación del proyecto: 'pdflatex', 'xelatex',
+    'lualatex' o 'auto' (detecta '% !TEX program = ...' o fontspec → xelatex)."""
+    STATE.set_engine(engine)
+    p = STATE.project
+    return {"engine": p.engine, "engine_setting": p.engine_setting or "auto"}
 
 
 @mcp.tool()

@@ -14,29 +14,59 @@ Todo local: sin base de datos, sin cuentas, sin nube.
 
 ## Requisitos
 
-- macOS con TeX Live en `/Library/TeX/texbin` (`latexmk`, `synctex`).
 - Python 3.11+.
+- Una distribución TeX con `latexmk` y `synctex`:
+  - **macOS**: MacTeX (`/Library/TeX/texbin`).
+  - **Windows**: MiKTeX + Strawberry Perl (latexmk es un script de Perl):
+    ```powershell
+    winget install MiKTeX.MiKTeX --scope user
+    winget install StrawberryPerl.StrawberryPerl
+    # que MiKTeX instale solo los paquetes que falten, sin ventanas:
+    initexmf --set-config-value="[MPM]AutoInstall=1"
+    ```
+    TeX Live para Windows también sirve (trae Perl incluido).
+  - **Linux**: TeX Live (`latexmk`, `synctex`).
+
+GoLatex busca los binarios en el `PATH` y en las rutas típicas de cada
+sistema; si los tienes en otro lado, define `GOLATEX_TEXBIN` con esa carpeta.
 
 ## Arrancar
+
+macOS / Linux:
 
 ```bash
 ./run.sh                      # abre http://localhost:8123 (último proyecto)
 ./run.sh /ruta/a/mi/proyecto  # abre esa carpeta directamente
 ```
 
+Windows (PowerShell, o doble clic en `run.bat`):
+
+```powershell
+.\run.bat                      # último proyecto
+.\run.bat C:\ruta\a\mi\tesis   # abre esa carpeta
+```
+
 La primera vez crea `.venv` e instala dependencias. Puerto configurable con
-`GOLATEX_PORT`.
+`GOLATEX_PORT`. El servidor escucha solo en `127.0.0.1`.
+
+## Motor de compilación
+
+Selector ⚙ junto al archivo principal: `auto`, `pdflatex`, `xelatex` o
+`lualatex` (se recuerda por proyecto). En `auto` se usa el comentario mágico
+`% !TEX program = xelatex` si existe; si no, `xelatex` cuando el principal carga
+`fontspec`, `unicode-math` o `polyglossia`, y `pdflatex` en otro caso. Los
+errores y warnings de BibTeX **y de biber** (`biblatex`) aparecen en el panel.
 
 ## Uso (cara humana)
 
 - **Abrir proyecto**: botón 📁 (recientes o explorador de carpetas).
-- **Editar**: clic en un `.tex`/`.bib` del árbol. `⌘S` guarda. Pestañas con
+- **Editar**: clic en un `.tex`/`.bib` del árbol. `⌘S` / `Ctrl+S` guarda. Pestañas con
   indicador de cambios sin guardar.
-- **Compilar**: botón ▶ o `⌘⏎` (raíz configurable con el selector ★; por
+- **Compilar**: botón ▶ o `⌘⏎` / `Ctrl+Enter` (raíz configurable con el selector ★; por
   defecto `main.tex`). El visor PDF se refresca manteniendo página y zoom.
 - **Problemas**: panel inferior con errores/warnings clicables (saltan al
   código); pestaña "Log crudo" con el log completo.
-- **SyncTeX**: `⌥`+clic (o doble clic) sobre el PDF salta a la línea de
+- **SyncTeX**: `⌥`+clic (`Alt`+clic en Windows) (o doble clic) sobre el PDF salta a la línea de
   código; `⌘⌥J` en el editor salta del código al PDF.
 - **Auto**: casilla "auto" recompila con cada guardado. 🌙 alterna modo oscuro.
 - **Árbol**: clic derecho para crear/renombrar/eliminar (va a la Papelera) y
@@ -61,7 +91,8 @@ Herramientas expuestas (siempre restringidas a la carpeta del proyecto abierto):
 
 | Tool | Qué hace |
 |---|---|
-| `project_info` | raíz, main, lista de `\input`, ¿PDF al día?, páginas |
+| `project_info` | raíz, main, motor, lista de `\input`, ¿PDF al día?, páginas |
+| `set_engine` | fija el motor: `pdflatex`, `xelatex`, `lualatex` o `auto` |
 | `list_files` | árbol del proyecto (sin artefactos) |
 | `read_file` / `write_file` | leer / escribir un archivo |
 | `edit_file` | reemplazo puntual (old → new, con control de unicidad) |
@@ -83,7 +114,8 @@ encolan y no se pisan).
 ## Estructura
 
 ```
-run.sh            arranque (venv + uvicorn + abrir navegador)
+run.sh            arranque macOS/Linux (venv + uvicorn + abrir navegador)
+run.ps1 / run.bat arranque Windows
 server/           FastAPI: REST + WebSocket + watcher + MCP (/mcp)
 web/              UI estática: CodeMirror + PDF.js (vendorizados)
 ```

@@ -5,6 +5,7 @@ sobre estas mismas instancias, así que comparten cola de compilación y
 eventos en vivo.
 """
 import time
+from pathlib import Path
 
 from .compiler import Compiler
 from .config import load_config, save_config
@@ -29,17 +30,22 @@ class AppState:
         return self.project
 
     def open_project(self, path: str) -> Project:
-        self.close_project()
+        try:
+            key = str(Path(path).expanduser().resolve())
+        except OSError:
+            key = str(path)
+        project = Project(path)  # valida la carpeta antes de cerrar la actual
         remembered = next(
-            (r for r in self.config["recents"] if r["path"] == str(path)), None)
-        main = remembered.get("main") if remembered else None
-        if main:
+            (r for r in self.config["recents"] if r["path"] == key), None)
+        if remembered:
             try:
-                project = Project(path, main)
+                project.set_engine(remembered.get("engine"))
             except ProjectError:
-                project = Project(path)
-        else:
-            project = Project(path)
+                pass
+            main = remembered.get("main")
+            if main and (project.root / main).is_file():
+                project.main = main
+        self.close_project()
         self.project = project
         self.compiler = Compiler(project, self.bus)
         self.watcher = ProjectWatcher(project, self.bus, self.compiler)
@@ -62,11 +68,18 @@ class AppState:
         self._remember()
         self.bus.broadcast({"type": "main_changed", "path": project.main})
 
+    def set_engine(self, engine: str | None):
+        project = self.require_project()
+        project.set_engine(engine)
+        self._remember()
+        self.bus.broadcast({"type": "engine_changed", "setting": project.engine_setting,
+                            "engine": project.engine})
+
     def _remember(self):
         if not self.project:
             return
         entry = {"path": str(self.project.root), "main": self.project.main,
-                 "opened_at": time.time()}
+                 "engine": self.project.engine_setting, "opened_at": time.time()}
         recents = [r for r in self.config["recents"]
                    if r["path"] != entry["path"]]
         self.config["recents"] = [entry, *recents][:10]

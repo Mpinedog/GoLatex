@@ -1,7 +1,10 @@
 """Utilidades de PDF con PyMuPDF: conteo de páginas y render a PNG."""
 from pathlib import Path
 
-import fitz  # PyMuPDF
+try:
+    import pymupdf as fitz  # PyMuPDF >= 1.24
+except ImportError:  # versiones antiguas
+    import fitz
 
 
 def page_count(pdf: Path) -> int:

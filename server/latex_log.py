@@ -7,7 +7,12 @@ mantiene una pila de paréntesis del log para atribuirlos al archivo activo.
 import re
 from pathlib import Path
 
-FILE_LINE_ERR = re.compile(r"^(?P<file>(?:\./)?[^:\s][^:]*?\.\w+):(?P<line>\d+):\s*(?P<msg>.*)$")
+# admite rutas relativas (./cap.tex) y absolutas de Windows (C:/.../cap.tex)
+FILE_LINE_ERR = re.compile(
+    r"^(?P<file>(?:[A-Za-z]:[\\/])?(?:\./)?[^:\s][^:]*?\.\w+):(?P<line>\d+):\s*(?P<msg>.*)$")
+WIN_ABS = re.compile(r"^[A-Za-z]:[\\/]")
+# biber: "[57] Biber.pm:131> WARN - I didn't find a database entry for 'x'"
+BIBER_LINE = re.compile(r"^\[\d+\]\s+\S+>\s+(?P<level>WARN|ERROR)\s+-\s+(?P<msg>.*)$")
 BANG_ERR = re.compile(r"^!\s*(?P<msg>.+)$")
 LATEX_WARN = re.compile(r"^(?:LaTeX|Class \S+|Package \S+)\s+Warning:\s*(?P<msg>.*)$", re.IGNORECASE)
 ON_LINE = re.compile(r"on input line (?P<line>\d+)")
@@ -29,9 +34,20 @@ def _unwrap(text: str, width: int = 79) -> list[str]:
 
 
 def _clean_file(name: str) -> str:
-    name = name.strip()
+    name = name.strip().replace("\\", "/")
     if name.startswith("./"):
         name = name[2:]
+    return name
+
+
+def _relative(name: str, root: Path | None) -> str:
+    """Ruta relativa a la raíz del proyecto (con '/') si cae dentro de ella."""
+    name = _clean_file(name)
+    if root and (name.startswith("/") or WIN_ABS.match(name)):
+        try:
+            return Path(name).resolve().relative_to(root).as_posix()
+        except (ValueError, OSError):
+            return name
     return name
 
 
@@ -62,13 +78,7 @@ class _FileStack:
         return None
 
     def _relative(self, name: str) -> str:
-        name = _clean_file(name)
-        if self.root and name.startswith("/"):
-            try:
-                return str(Path(name).resolve().relative_to(self.root))
-            except ValueError:
-                return name
-        return name
+        return _relative(name, self.root)
 
 
 def parse_log(log_text: str, root: Path | None = None) -> dict:
@@ -100,7 +110,7 @@ def parse_log(log_text: str, root: Path | None = None) -> dict:
             if detail:
                 msg = msg + " — " + " ".join(detail)[:200]
             errors.append({
-                "file": _clean_file(m.group("file")),
+                "file": _relative(m.group("file"), root),
                 "line": int(m.group("line")),
                 "message": msg.strip(),
                 "type": "error",
@@ -165,9 +175,15 @@ def parse_log(log_text: str, root: Path | None = None) -> dict:
 
 
 def parse_blg(blg_text: str) -> list[dict]:
-    """Errores/warnings de BibTeX (main.blg)."""
+    """Errores/warnings de BibTeX o de biber (main.blg)."""
     items: list[dict] = []
     for line in blg_text.splitlines():
+        m = BIBER_LINE.match(line.strip())
+        if m:
+            items.append({"file": None, "line": None,
+                          "message": f"biber: {m.group('msg').strip()}",
+                          "type": "error" if m.group("level") == "ERROR" else "warning"})
+            continue
         if line.startswith("Warning--"):
             items.append({"file": None, "line": None,
                           "message": f"BibTeX: {line[len('Warning--'):].strip()}",

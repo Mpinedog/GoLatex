@@ -3,15 +3,20 @@ import re
 import subprocess
 from pathlib import Path
 
-from .config import tex_env
+from .config import tex_cmd, tex_env, tex_install_hint
 from .project import Project, ProjectError
 
 
 def _run(args: list[str], cwd: Path) -> str:
+    exe = tex_cmd("synctex")
+    if not exe:
+        raise ProjectError(f"synctex no encontrado: {tex_install_hint()}")
     try:
         out = subprocess.run(
-            args, cwd=str(cwd), env=tex_env(),
-            capture_output=True, text=True, timeout=15,
+            [exe, *args[1:]], cwd=str(cwd), env=tex_env(),
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=15, stdin=subprocess.DEVNULL,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
         return out.stdout
     except (subprocess.TimeoutExpired, FileNotFoundError) as e:
@@ -61,9 +66,11 @@ def inverse(project: Project, page: int, x: float, y: float) -> dict:
     if "input" not in rec or "line" not in rec:
         raise ProjectError("SyncTeX no pudo mapear ese punto del PDF")
     src = Path(rec["input"])
+    if not src.is_absolute():
+        src = project.root / src
     try:
-        file_rel = str(src.resolve().relative_to(project.root))
-    except ValueError:
-        file_rel = rec["input"]
+        file_rel = src.resolve().relative_to(project.root).as_posix()
+    except (ValueError, OSError):
+        file_rel = rec["input"].replace("\\", "/")
     return {"file": file_rel, "line": int(rec["line"]),
             "column": int(rec.get("column", 0) or 0)}

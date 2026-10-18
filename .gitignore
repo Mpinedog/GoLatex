@@ -1,6 +1,5 @@
 .venv/
 .claude/
-run.sh
 __pycache__/
 *.pyc
 ejemplo/main.pdf

@@ -25,6 +25,7 @@ export const api = {
   rename: (path, new_path) => j('POST', '/api/fs/rename', { path, new_path }),
   del: (path) => j('POST', '/api/fs/delete', { path }),
   setMain: (path) => j('POST', '/api/main', { path }),
+  setEngine: (engine) => j('POST', '/api/engine', { engine }),
   compile: () => j('POST', '/api/compile'),
   log: () => j('GET', '/api/log'),
   browse: (path) => j('GET', `/api/browse?path=${encodeURIComponent(path || '')}`),

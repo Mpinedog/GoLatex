@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from . import bib as bib_tools
 from . import pdf_utils, synctex_tools
+from .config import ENGINES
 from .mcp_app import mcp
 from .project import ProjectError
 from .state import STATE
@@ -74,6 +75,10 @@ class PathBody(BaseModel):
     path: str
 
 
+class EngineBody(BaseModel):
+    engine: str | None = None  # pdflatex | xelatex | lualatex | None/"auto"
+
+
 # ---------- estado / proyecto ----------
 
 def _project_dict():
@@ -81,7 +86,8 @@ def _project_dict():
     if not p:
         return None
     return {"root": str(p.root), "name": p.root.name, "main": p.main,
-            "pdf_exists": p.pdf_path.exists()}
+            "engine": p.engine, "engine_setting": p.engine_setting,
+            "engines": list(ENGINES), "pdf_exists": p.pdf_path.exists()}
 
 
 @app.get("/api/state")
@@ -105,6 +111,13 @@ def set_main(body: PathBody):
     return {"main": STATE.project.main}
 
 
+@app.post("/api/engine")
+def set_engine(body: EngineBody):
+    STATE.set_engine(body.engine)
+    p = STATE.project
+    return {"engine": p.engine, "engine_setting": p.engine_setting}
+
+
 @app.get("/api/browse")
 def browse(path: str = ""):
     """Selector de carpetas: lista subdirectorios de una ruta del usuario."""
@@ -120,7 +133,7 @@ def browse(path: str = ""):
         has_tex = any(base.glob("*.tex"))
     except PermissionError:
         raise HTTPException(403, f"Sin permiso para leer {base}")
-    return {"path": str(base),
+    return {"path": str(base), "sep": os.sep,
             "parent": str(base.parent) if base != base.parent else None,
             "dirs": dirs, "has_tex": has_tex}
 

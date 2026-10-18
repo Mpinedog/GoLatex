@@ -10,6 +10,27 @@ import * as errors from './errors.js';
 let project = null;
 let compiling = false;
 
+const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+const baseName = (p) => p.split(/[\\/]/).filter(Boolean).pop() || p;
+
+// En Windows/Linux los atajos se muestran con Ctrl/Alt en vez de ⌘/⌥.
+function localizeShortcuts() {
+  if (IS_MAC) return;
+  const hints = document.getElementById('kbd-hints');
+  if (hints) {
+    hints.innerHTML = '';
+    for (const [k, label] of [['Ctrl+S', ' guardar \u00a0 '], ['Ctrl+Enter', ' compilar \u00a0 '],
+                              ['Alt+clic', ' en el PDF → código']]) {
+      const kbd = document.createElement('kbd');
+      kbd.textContent = k;
+      hints.append(kbd, label);
+    }
+  }
+  document.querySelectorAll('.hint').forEach((el) => {
+    el.textContent = el.textContent.replace('⌥', 'Alt+');
+  });
+}
+
 // ---------- tema ----------
 
 function applyTheme(theme) {
@@ -82,6 +103,23 @@ async function boot() {
   fillMainSelect(nodes);
   if (project.pdf_exists) pdf.reloadPdf();
   if (st.last_compile) errors.showResult(st.last_compile);
+  fillEngineSelect();
+}
+
+function fillEngineSelect() {
+  const sel = document.getElementById('engine-select');
+  sel.innerHTML = '';
+  const detected = project.engine_setting ? null : project.engine;
+  const opts = [['auto', `auto (${detected || 'detectar'})`],
+                ...(project.engines || ['pdflatex', 'xelatex', 'lualatex']).map((e) => [e, e])];
+  for (const [value, label] of opts) {
+    const o = document.createElement('option');
+    o.value = value;
+    o.textContent = '⚙ ' + label;
+    if ((project.engine_setting || 'auto') === value) o.selected = true;
+    sel.appendChild(o);
+  }
+  sel.onchange = () => api.setEngine(sel.value).catch((e) => toast(e.message, 'err'));
 }
 
 function collectTex(nodes, out = []) {
@@ -116,7 +154,7 @@ function renderRecents(recents) {
   for (const r of recents) {
     const el = document.createElement('div');
     el.className = 'recent';
-    el.innerHTML = `<span class="rname">${r.path.split('/').pop()}</span><span class="rpath">${r.path}</span>`;
+    el.innerHTML = `<span class="rname">${baseName(r.path)}</span><span class="rpath">${r.path}</span>`;
     el.onclick = () => doOpen(r.path);
     box.appendChild(el);
   }
@@ -140,7 +178,7 @@ async function browse(path) {
       const el = document.createElement('div');
       el.className = 'bdir';
       el.innerHTML = `<span>📁 ${d}</span>`;
-      el.onclick = () => browse(r.path + '/' + d);
+      el.onclick = () => browse(r.path.replace(/[\\/]+$/, '') + (r.sep || '/') + d);
       list.appendChild(el);
     }
     document.getElementById('browse-open').textContent =
@@ -172,6 +210,7 @@ function openProjectDialog(cancelable = true) {
 // ---------- wiring ----------
 
 function init() {
+  localizeShortcuts();
   applyTheme(localStorage.getItem('golatex.theme')
     || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
 
@@ -257,6 +296,13 @@ function init() {
     const nodes = await tree.refreshTree();
     fillMainSelect(nodes);
     toast('Archivo principal: ' + ev.path, 'ok', 2000);
+  });
+  on('engine_changed', (ev) => {
+    if (!project) return;
+    project.engine = ev.engine;
+    project.engine_setting = ev.setting;
+    fillEngineSelect();
+    toast('Motor: ' + (ev.setting || `auto (${ev.engine})`), 'ok', 2000);
   });
   on('project_opened', (ev) => {
     if (!project || project.root !== ev.root) location.reload();
