@@ -154,7 +154,13 @@ function renderRecents(recents) {
   for (const r of recents) {
     const el = document.createElement('div');
     el.className = 'recent';
-    el.innerHTML = `<span class="rname">${baseName(r.path)}</span><span class="rpath">${r.path}</span>`;
+    const rname = document.createElement('span');
+    rname.className = 'rname';
+    rname.textContent = baseName(r.path);
+    const rpath = document.createElement('span');
+    rpath.className = 'rpath';
+    rpath.textContent = r.path;
+    el.append(rname, rpath);
     el.onclick = () => doOpen(r.path);
     box.appendChild(el);
   }
@@ -177,7 +183,9 @@ async function browse(path) {
     for (const d of r.dirs) {
       const el = document.createElement('div');
       el.className = 'bdir';
-      el.innerHTML = `<span>📁 ${d}</span>`;
+      const label = document.createElement('span');
+      label.textContent = '📁 ' + d;  // textContent: un nombre de carpeta no puede inyectar HTML
+      el.appendChild(label);
       el.onclick = () => browse(r.path.replace(/[\\/]+$/, '') + (r.sep || '/') + d);
       list.appendChild(el);
     }

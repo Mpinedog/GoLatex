@@ -47,7 +47,9 @@ Windows (PowerShell, o doble clic en `run.bat`):
 ```
 
 La primera vez crea `.venv` e instala dependencias. Puerto configurable con
-`GOLATEX_PORT`. El servidor escucha solo en `127.0.0.1`.
+`GOLATEX_PORT`. El servidor escucha solo en `127.0.0.1` y rechaza peticiones
+con otro `Host` (protección contra DNS rebinding); para permitir más nombres,
+`GOLATEX_ALLOWED_HOSTS=nombre1,nombre2`.
 
 ## Motor de compilación
 

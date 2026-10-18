@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import bib as bib_tools
 from . import pdf_utils, synctex_tools
@@ -20,6 +21,11 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("golatex")
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+
+# Solo se atiende a localhost: bloquea ataques de "DNS rebinding" (una web
+# maliciosa que resuelve su dominio a 127.0.0.1 para leer tus archivos).
+ALLOWED_HOSTS = ["localhost", "127.0.0.1",
+                 *filter(None, os.environ.get("GOLATEX_ALLOWED_HOSTS", "").split(","))]
 
 
 @asynccontextmanager
@@ -244,8 +250,21 @@ def bib_list(bib_file: str | None = None):
 
 # ---------- websocket ----------
 
+def _origin_ok(origin: str | None) -> bool:
+    """El WebSocket solo acepta conexiones desde la propia app (evita que otra
+    pestaña del navegador escuche los eventos del proyecto)."""
+    if not origin:
+        return True  # clientes que no son navegadores
+    from urllib.parse import urlparse
+    host = urlparse(origin).hostname or ""
+    return host in ALLOWED_HOSTS
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
+    if not _origin_ok(ws.headers.get("origin")):
+        await ws.close(code=1008)
+        return
     await STATE.bus.connect(ws)
     try:
         while True:
@@ -272,6 +291,7 @@ class _MCPPathFix:
 
 
 app.add_middleware(_MCPPathFix)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
 mcp.settings.streamable_http_path = "/"
 app.mount("/mcp", mcp.streamable_http_app())
 app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")
