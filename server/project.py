@@ -151,24 +151,39 @@ class Project:
         return Path(str(self.main_path.with_suffix("")) + ".synctex.gz")
 
     def inputs(self) -> list[str]:
-        """Archivos referenciados con \\input / \\include desde el principal."""
+        """Archivos incluidos desde el principal, recursivamente: \\input,
+        \\include, \\subfile, \\import y \\subimport. Rutas con '/'."""
         found: list[str] = []
         seen: set[str] = set()
+        rx = re.compile(
+            r"\\(?P<cmd>input|include|subfile|import|subimport|inputfrom|subinputfrom)\*?"
+            r"\s*\{(?P<a>[^}]*)\}(?:\s*\{(?P<b>[^}]*)\})?")
 
         def scan(rel: str):
             if rel in seen:
                 return
             seen.add(rel)
+            base = Path(rel).parent
             try:
                 text = (self.root / rel).read_text(encoding="utf-8", errors="replace")
             except OSError:
                 return
             text = re.sub(r"(?<!\\)%.*", "", text)  # sin comentarios
-            for m in re.finditer(r"\\(?:input|include)\{([^}]+)\}", text):
-                name = m.group(1).strip()
+            for m in rx.finditer(text):
+                cmd, a, b = m.group("cmd"), m.group("a").strip(), (m.group("b") or "").strip()
+                if cmd in ("import", "inputfrom"):          # ruta absoluta desde la raíz
+                    name = (Path(a) / b).as_posix() if b else a
+                elif cmd in ("subimport", "subinputfrom"):  # relativa al archivo actual
+                    name = (base / a / b).as_posix() if b else a
+                else:
+                    name = a
+                if not name or "#" in name:
+                    continue
                 if not name.endswith(".tex"):
                     name += ".tex"
-                if (self.root / name).exists():
+                p = self.root / name
+                if p.is_file():
+                    name = self.relpath(p)
                     if name not in found:
                         found.append(name)
                     scan(name)
