@@ -120,6 +120,13 @@ Nota: el MCP opera sobre el proyecto **abierto en la app** (una sola sesión y
 cola de compilación compartida: si el humano y el agente compilan a la vez, se
 encolan y no se pisan).
 
+## Pruebas
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest -q
+```
+
 ## Estructura
 
 ```
