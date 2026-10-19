@@ -14,7 +14,7 @@ from . import bib as bib_tools
 from . import pdf_utils, synctex_tools
 from .config import ENGINES
 from .mcp_app import mcp
-from .project import ProjectError
+from .project import ConflictError, ProjectError
 from .state import STATE
 
 logging.basicConfig(level=logging.INFO)
@@ -53,6 +53,9 @@ app = FastAPI(title="GoLatex", lifespan=lifespan)
 
 @app.exception_handler(ProjectError)
 async def project_error_handler(request, exc: ProjectError):
+    if isinstance(exc, ConflictError):
+        return JSONResponse(status_code=409, content={"detail": str(exc),
+                                                      "hash": exc.current_hash})
     return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
@@ -65,6 +68,7 @@ class OpenBody(BaseModel):
 class FileBody(BaseModel):
     path: str
     content: str
+    base_hash: str | None = None  # hash que el editor leyó; None = sin control
 
 
 class FsCreateBody(BaseModel):
@@ -159,7 +163,8 @@ def read_file(path: str):
 
 @app.put("/api/file")
 def write_file(body: FileBody):
-    h, mtime = STATE.require_project().write_text(body.path, body.content)
+    h, mtime = STATE.require_project().write_text(body.path, body.content,
+                                                  expected_hash=body.base_hash)
     return {"path": body.path, "hash": h, "mtime": mtime}
 
 

@@ -4,8 +4,10 @@ Toda ruta que llega de la API o del MCP es relativa a la raíz del proyecto y
 se valida con `resolve()`: nunca se toca nada fuera de la carpeta abierta.
 """
 import hashlib
+import os
 import re
 import shutil
+import time
 from pathlib import Path
 
 from send2trash import send2trash
@@ -29,6 +31,16 @@ TEXT_EXTS = {
 
 class ProjectError(Exception):
     pass
+
+
+class ConflictError(ProjectError):
+    """El archivo cambió en disco desde que el cliente lo leyó."""
+
+    def __init__(self, rel: str, current_hash: str | None):
+        super().__init__(
+            f"{rel} cambió en el disco desde que lo abriste (otro editor o el "
+            "agente lo modificó). Recárgalo o elige mantener tu versión.")
+        self.current_hash = current_hash
 
 
 def is_artifact(path: Path) -> bool:
@@ -228,11 +240,28 @@ class Project:
             text = data.decode("latin-1")
         return text, content_hash(data), p.stat().st_mtime
 
-    def write_text(self, rel: str, content: str) -> tuple[str, float]:
+    def current_hash(self, rel: str) -> str | None:
         p = self.resolve(rel)
+        try:
+            return content_hash(p.read_bytes())
+        except FileNotFoundError:
+            return None
+
+    def write_text(self, rel: str, content: str,
+                   expected_hash: str | None = None) -> tuple[str, float]:
+        """Escribe el archivo de forma atómica.
+
+        Si `expected_hash` viene, el archivo debe seguir teniendo ese contenido
+        (control optimista): si alguien más lo cambió entretanto, ConflictError
+        en vez de pisar sus cambios en silencio."""
+        p = self.resolve(rel)
+        if expected_hash is not None:
+            now = self.current_hash(rel)
+            if now is not None and now != expected_hash:
+                raise ConflictError(rel, now)
         p.parent.mkdir(parents=True, exist_ok=True)
         data = content.encode("utf-8")
-        p.write_bytes(data)
+        _atomic_write(p, data)
         return content_hash(data), p.stat().st_mtime
 
     def create_file(self, rel: str) -> None:
@@ -299,3 +328,28 @@ class Project:
                     if len(results) >= max_results:
                         break
         return results
+
+
+def _atomic_write(p: Path, data: bytes) -> None:
+    """Escribe a un temporal oculto y lo renombra encima: un corte de luz o un
+    error a mitad de camino nunca deja el .tex truncado. En Windows el rename
+    falla si otro proceso tiene el archivo abierto (p. ej. LaTeX compilando);
+    se reintenta un momento y, si sigue bloqueado, se escribe directo."""
+    tmp = p.with_name(f".{p.name}.golatex-tmp")
+    try:
+        with open(tmp, "wb") as f:
+            f.write(data)
+            f.flush()
+            os.fsync(f.fileno())
+        for attempt in range(10):
+            try:
+                os.replace(tmp, p)
+                return
+            except PermissionError:
+                time.sleep(0.05 * (attempt + 1))
+        p.write_bytes(data)
+    finally:
+        try:
+            tmp.unlink()
+        except FileNotFoundError:
+            pass

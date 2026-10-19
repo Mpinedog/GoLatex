@@ -8,8 +8,12 @@ async function j(method, url, body) {
   const res = await fetch(url, opts);
   if (!res.ok) {
     let detail = res.statusText;
-    try { detail = (await res.json()).detail || detail; } catch { /* texto plano */ }
-    throw new Error(detail);
+    let data = null;
+    try { data = await res.json(); detail = data.detail || detail; } catch { /* texto plano */ }
+    const err = new Error(detail);
+    err.status = res.status;
+    err.data = data;
+    throw err;
   }
   const ct = res.headers.get('content-type') || '';
   return ct.includes('json') ? res.json() : res.text();
@@ -20,7 +24,8 @@ export const api = {
   open: (path) => j('POST', '/api/project/open', { path }),
   tree: () => j('GET', '/api/tree'),
   read: (path) => j('GET', `/api/file?path=${encodeURIComponent(path)}`),
-  write: (path, content) => j('PUT', '/api/file', { path, content }),
+  write: (path, content, base_hash = null) =>
+    j('PUT', '/api/file', { path, content, base_hash }),
   create: (path, type) => j('POST', '/api/fs/create', { path, type }),
   rename: (path, new_path) => j('POST', '/api/fs/rename', { path, new_path }),
   del: (path) => j('POST', '/api/fs/delete', { path }),

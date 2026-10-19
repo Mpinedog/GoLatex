@@ -44,10 +44,17 @@ export function initEditor(options) {
     if (current) await forceReload(current);
     hideBanner();
   };
-  document.getElementById('ext-keep').onclick = () => {
+  document.getElementById('ext-keep').onclick = async () => {
     const entry = open.get(current);
-    if (entry) entry.conflict = false;
+    if (!entry) return;
+    // tomar el hash actual del disco como base: el próximo guardado
+    // sobrescribe a propósito la versión externa
+    try {
+      entry.savedHash = (await api.read(current)).hash;
+    } catch { /* si ya no existe, guardar lo recrea */ }
+    entry.conflict = false;
     hideBanner();
+    renderTabs();
     toast('Se mantiene tu versión local; al guardar sobrescribirás el disco.', 'warn');
   };
 }
@@ -97,15 +104,25 @@ export async function saveCurrent() {
   if (!current) return;
   const entry = open.get(current);
   const content = entry.doc.getValue();
+  const gen = entry.doc.changeGeneration();  // antes del await: lo que se tipee mientras tanto sigue "sucio"
+  const path = current;
   try {
-    const r = await api.write(current, content);
+    const r = await api.write(path, content, entry.savedHash);
     entry.savedHash = r.hash;
-    entry.cleanGen = entry.doc.changeGeneration();
+    entry.cleanGen = gen;
     entry.conflict = false;
     hideBanner();
     renderTabs();
-    opts.onSave?.(current);
+    opts.onSave?.(path);
   } catch (e) {
+    if (e.status === 409) {
+      // otro (el agente u otro editor) lo cambió: no pisar, avisar
+      entry.conflict = true;
+      if (path === current) showBanner(path);
+      renderTabs();
+      toast(`${path} cambió en el disco: no se guardó para no pisar esos cambios.`, 'warn', 6000);
+      return;
+    }
     toast(`Error al guardar: ${e.message}`, 'err');
   }
 }

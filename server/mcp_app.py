@@ -86,7 +86,7 @@ def edit_file(path: str, old_string: str, new_string: str,
     cual; si aparece más de una vez y replace_all es False, es un error
     (agrega contexto para hacerlo único)."""
     project = STATE.require_project()
-    content, _, _ = project.read_text(path)
+    content, base_hash, _ = project.read_text(path)
     count = content.count(old_string)
     if count == 0:
         raise ProjectError(f"No se encontró el texto a reemplazar en {path}")
@@ -98,7 +98,8 @@ def edit_file(path: str, old_string: str, new_string: str,
         new_content = content.replace(old_string, new_string)
     else:
         new_content = content.replace(old_string, new_string, 1)
-    project.write_text(path, new_content)
+    # si el humano guardó entre la lectura y la escritura, no se pisa su cambio
+    project.write_text(path, new_content, expected_hash=base_hash)
     return {"ok": True, "path": path, "replacements": count if replace_all else 1}
 
 
