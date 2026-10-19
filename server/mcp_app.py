@@ -9,6 +9,7 @@ from mcp.server.fastmcp import FastMCP, Image
 
 from . import ai_detect
 from . import bib as bib_tools
+from . import history
 from . import pdf_utils
 from .project import ProjectError
 from .state import STATE
@@ -165,3 +166,19 @@ def bib_add(entry: str, bib_file: Optional[str] = None) -> dict:
     """Agrega una entrada BibTeX completa (texto '@tipo{clave, ...}') al .bib
     del proyecto, validando llaves y clave duplicada."""
     return bib_tools.add_entry(STATE.require_project(), entry, bib_file)
+
+
+@mcp.tool()
+def checkpoint(message: str, push: bool = False, init: bool = False) -> dict:
+    """Punto de control con git: `git add` + `git commit` de la carpeta del
+    proyecto con `message` (qué cambió, p. ej. 'Cap. 4: resultados Kappa').
+    Úsalo al terminar cada sección. `push=true` también hace git push;
+    `init=true` crea el repositorio si no existe (con .gitignore de LaTeX)."""
+    return history.checkpoint(STATE.require_project(), message, push, init)
+
+
+@mcp.tool()
+def history_log(n: int = 10) -> list:
+    """Últimos `n` puntos de control (commits) del proyecto: hash, fecha y
+    mensaje. Para volver atrás, lee el archivo de ese commit con git."""
+    return history.log(STATE.require_project(), n)

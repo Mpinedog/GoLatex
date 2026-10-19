@@ -103,11 +103,18 @@ Herramientas expuestas (siempre restringidas a la carpeta del proyecto abierto):
 | `render_page` | página N del PDF como imagen PNG (para *ver* el resultado) |
 | `search` | grep (regex) sobre los archivos de texto del proyecto |
 | `bib_list` / `bib_add` | listar / agregar entradas de `references.bib` |
+| `checkpoint` | punto de control con git (`add` + `commit` de la carpeta del proyecto; `push` e `init` opcionales) |
+| `history_log` | últimos puntos de control (hash, fecha, mensaje) |
 | `ai_check` | estima qué tan "IA" suena un `.tex` del proyecto (o texto directo): score 0–1, párrafos sospechosos y señales (detector local [texthumanize](https://github.com/ksanyok/TextHumanize), sin red). Orientativo: ningún detector de IA es concluyente |
 
 Ejemplo de sesión con el agente: *"agrega un typo deliberado en
 capitulo_4.tex, compílalo, léeme el error, arréglalo y recompila"* — cada
 cambio y compilación se ve en vivo en la app.
+
+Guardar es seguro frente al agente: la escritura es atómica y, si el archivo
+cambió en disco desde que lo abriste, la app no lo pisa (te muestra el aviso
+para recargar o mantener tu versión). Para poder volver atrás, deja la carpeta
+del proyecto en git y pide al agente un `checkpoint` al cerrar cada sección.
 
 Nota: el MCP opera sobre el proyecto **abierto en la app** (una sola sesión y
 cola de compilación compartida: si el humano y el agente compilan a la vez, se
